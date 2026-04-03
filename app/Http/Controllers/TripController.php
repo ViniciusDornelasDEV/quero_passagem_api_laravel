@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Helpers\ApiResponse;
 use App\Http\Requests\SearchTripRequest;
+use App\Http\Resources\TripResource;
 use App\Services\TripService;
 use Illuminate\Http\JsonResponse;
 
@@ -17,8 +19,6 @@ class TripController extends Controller
     {
         $trips = $this->tripService->search($request->validated());
 
-        return response()->json([
-            'data' => $trips,
-        ]);
+        return ApiResponse::success(TripResource::collection($trips));
     }
 }

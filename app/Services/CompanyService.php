@@ -18,4 +18,16 @@ class CompanyService
             return $this->client->getCompany($id);
         });
     }
+
+    public function getCompanies(): array
+    {
+        $payload = $this->client->getCompanies();
+        $companies = $payload['companies'] ?? $payload;
+
+        return collect($companies)
+            ->filter(fn (mixed $company): bool => is_array($company))
+            ->map(fn (array $company): array => $company)
+            ->values()
+            ->all();
+    }
 }
