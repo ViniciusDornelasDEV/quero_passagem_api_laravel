@@ -40,6 +40,11 @@ class QueroPassagemClient
         return $this->request()->post('/new/search', $data)->throw()->json();
     }
 
+    public function getSeats(array $data): array
+    {
+        return $this->request()->post('/new/seats', $data)->throw()->json();
+    }
+
     private function request(): PendingRequest
     {
         $baseUrl = (string) config('services.queropassagem.base_url');

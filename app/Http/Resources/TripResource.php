@@ -5,14 +5,8 @@ namespace App\Http\Resources;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
-/**
- * @mixin array<string, mixed>
- */
 class TripResource extends JsonResource
 {
-    /**
-     * @return array<string, mixed>
-     */
     public function toArray(Request $request): array
     {
         $company = data_get($this->resource, 'company', []);
@@ -51,9 +45,6 @@ class TripResource extends JsonResource
         ];
     }
 
-    /**
-     * @param  array<string, mixed>  $company
-     */
     private function resolveCompanyLogo(array $company): mixed
     {
         $svg = data_get($company, 'logo.svg');
