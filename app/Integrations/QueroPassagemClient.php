@@ -19,6 +19,27 @@ class QueroPassagemClient
         return $this->request()->get('/stops')->throw()->json();
     }
 
+    public function getCompanies(): array
+    {
+        return $this->request()->get('/companies')->throw()->json();
+    }
+
+    public function getCompany(string $id): array
+    {
+        return $this->request()->get("/companies/{$id}")->throw()->json();
+    }
+
+    public function search(array $data): array
+    {
+        $affiliate = config('services.queropassagem.affiliate');    
+        if (filled($affiliate)) {
+            $data['affiliateCode'] = (string) $affiliate;
+        }
+        $data['include-connections'] = false;
+
+        return $this->request()->post('/new/search', $data)->throw()->json();
+    }
+
     private function request(): PendingRequest
     {
         $baseUrl = (string) config('services.queropassagem.base_url');

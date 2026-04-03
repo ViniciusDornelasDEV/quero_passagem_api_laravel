@@ -20,6 +20,28 @@ class StopService
         });
     }
 
+    public function getAllowedStops(): array
+    {
+        return collect($this->getStops())->filter(function (array $stop): bool {
+            $name = (string) ($stop['name'] ?? '');
+            return str_contains($name, ', SP') || str_contains($name, ', PR');
+        })->values()->all();
+    }
+
+    public function validateStop(string $id): array
+    {
+        $stop = collect($this->getStops())
+            ->first(fn (array $item): bool => (string) ($item['id'] ?? '') === $id);
+
+        if ($stop === null) {
+            throw ValidationException::withMessages([
+                'stop' => "Rodoviária não encontrada.",
+            ]);
+        }
+
+        return $stop;
+    }
+
     private function normalizeStops(array $payload): array
     {
         $stops = $payload;
