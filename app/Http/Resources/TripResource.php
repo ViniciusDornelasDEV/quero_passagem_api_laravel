@@ -16,7 +16,7 @@ class TripResource extends JsonResource
             'company' => [
                 'id' => data_get($company, 'id'),
                 'name' => data_get($company, 'name'),
-                'logo' => $this->resolveCompanyLogo($company),
+                'logo' => data_get($company, 'logo'),
             ],
             'from' => [
                 'id' => data_get($this->resource, 'from.id'),
@@ -43,24 +43,5 @@ class TripResource extends JsonResource
             'availableSeats' => data_get($this->resource, 'availableSeats'),
             'seatClass' => data_get($this->resource, 'seatClass'),
         ];
-    }
-
-    private function resolveCompanyLogo(array $company): mixed
-    {
-        $svg = data_get($company, 'logo.svg');
-
-        if (filled($svg)) {
-            return $svg;
-        }
-
-        $jpg = data_get($company, 'logo.jpg');
-
-        if (filled($jpg)) {
-            return $jpg;
-        }
-
-        $logo = data_get($company, 'logo');
-
-        return is_string($logo) ? $logo : null;
     }
 }

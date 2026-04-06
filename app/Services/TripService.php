@@ -5,7 +5,6 @@ namespace App\Services;
 use App\Integrations\QueroPassagemClient;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
-use Throwable;
 
 class TripService
 {
@@ -72,6 +71,7 @@ class TripService
 
     private function loadCompaniesForTrips(Collection $trips): Collection
     {
+        $company = $this->companyService->getCompany(2);
         return $trips
             ->pluck('company.id')
             ->filter()
@@ -89,14 +89,31 @@ class TripService
     {
         return $trips->map(function (array $trip) use ($companyMap): array {
             $companyId = (string) data_get($trip, 'company.id', '');
-            $company = $companyMap->get($companyId, []);
-            $logo = data_get($company, 'logo');
+            $fetched = $companyMap->get($companyId, []);
+            $source = $fetched !== [] ? $fetched : (array) data_get($trip, 'company', []);
 
-            if ($logo !== null) {
-                data_set($trip, 'company.logo', $logo);
-            }
+            data_set($trip, 'company.logo', $this->resolveCompanyLogoUrl($source));
 
             return $trip;
         });
+    }
+
+    private function resolveCompanyLogoUrl(array $company): ?string
+    {
+        $svg = data_get($company, 'logo.svg');
+
+        if (filled($svg) && is_string($svg)) {
+            return $svg;
+        }
+
+        $jpg = data_get($company, 'logo.jpg');
+
+        if (filled($jpg) && is_string($jpg)) {
+            return $jpg;
+        }
+
+        $logo = data_get($company, 'logo');
+
+        return is_string($logo) ? $logo : null;
     }
 }
