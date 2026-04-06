@@ -42,6 +42,42 @@ class StopService
         return $stop;
     }
 
+    public function expandStopIds(string $id): array
+    {
+        $stop = collect($this->getStops())
+            ->first(fn (array $item): bool => (string) ($item['id'] ?? '') === $id);
+
+        if (! is_array($stop)) {
+            return [$id];
+        }
+
+        if (($stop['type'] ?? '') !== 'city') {
+            return [$id];
+        }
+
+        $substops = $stop['substops'] ?? [];
+        if (! is_array($substops) || $substops === []) {
+            return [$id];
+        }
+
+        $ids = [];
+
+        foreach ($substops as $substop) {
+            if (! is_array($substop)) {
+                continue;
+            }
+
+            $substopId = (string) ($substop['id'] ?? '');
+            if ($substopId === '') {
+                continue;
+            }
+
+            $ids[] = $substopId;
+        }
+
+        return $ids !== [] ? array_values(array_unique($ids)) : [$id];
+    }
+
     private function normalizeStops(array $payload): array
     {
         $stops = $payload;

@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Integrations\QueroPassagemClient;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
+use Throwable;
 
 class TripService
 {
@@ -12,8 +13,7 @@ class TripService
         private readonly QueroPassagemClient $client,
         private readonly StopService $stopService,
         private readonly CompanyService $companyService,
-    ) {
-    }
+    ) {}
 
     public function search(array $data): array
     {
@@ -29,13 +29,35 @@ class TripService
         $this->stopService->validateStop($from);
         $this->stopService->validateStop($to);
 
-        $payload = $this->client->search($data);
-        $trips = $this->extractTrips($payload);
+        $fromIds = $this->stopService->expandStopIds($from);
+        $toIds = $this->stopService->expandStopIds($to);
+
+        $trips = $this->searchTripsForStopCombinations($data, $fromIds, $toIds);
+
         $trips = $this->sortTrips($trips);
         $companyMap = $this->loadCompaniesForTrips($trips);
         $trips = $this->enrichTripsWithCompany($trips, $companyMap);
 
         return $trips->values()->all();
+    }
+
+    private function searchTripsForStopCombinations(array $data, array $fromIds, array $toIds): Collection
+    {
+        $results = collect();
+
+        foreach ($fromIds as $fromId) {
+            foreach ($toIds as $toId) {
+                $payload = $this->client->search([
+                    ...$data,
+                    'from' => $fromId,
+                    'to' => $toId,
+                ]);
+
+                $results = $results->merge($this->extractTrips($payload));
+            }
+        }
+
+        return $results;
     }
 
     private function extractTrips(array $payload): Collection
