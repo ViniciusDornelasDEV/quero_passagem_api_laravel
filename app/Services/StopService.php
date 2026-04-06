@@ -3,8 +3,10 @@
 namespace App\Services;
 
 use App\Integrations\QueroPassagemClient;
+use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Validation\ValidationException;
+use RuntimeException;
 
 class StopService
 {
@@ -14,9 +16,29 @@ class StopService
 
     public function getStops(): array
     {
-        return Cache::remember('stops', now()->addDay(), function (): array {
-            return $this->normalizeStops($this->client->getStops());
-        });
+        if (! Cache::has('stops_full')) {
+            throw new RuntimeException('Stops cache not warmed.');
+        }
+
+        $stops = Cache::get('stops_full');
+
+        return is_array($stops) ? $stops : [];
+    }
+
+    public function getStopDetail(string $id): array
+    {
+        return $this->client->getStop($id);
+    }
+
+    public function warmupStopsCache(?Command $command = null): array
+    {
+        $stops = $this->extractStops($this->client->getStops());
+        $enrichedStops = $this->enrichStops($stops, $command);
+        $normalizedStops = $this->normalizeStops($enrichedStops);
+
+        Cache::put('stops_full', $normalizedStops, now()->addDay());
+
+        return $normalizedStops;
     }
 
     public function validateStop(string $id): array
@@ -80,11 +102,7 @@ class StopService
     {
         $allowedStates = config('queropassagem.allowed_states', []);
 
-        $stops = $payload;
-
-        if (isset($payload['stops']) && is_array($payload['stops'])) {
-            $stops = $payload['stops'];
-        }
+        $stops = $this->extractStops($payload);
 
         $normalized = [];
 
@@ -115,7 +133,7 @@ class StopService
         }
 
         $name = (string) ($item['name'] ?? '');
-        $state = $this->extractState($name);
+        $state = $this->resolveState($item, $name);
 
         return [
             'id' => (string) ($item['id'] ?? ''),
@@ -131,7 +149,7 @@ class StopService
     private function normalizeSubstop(array $sub, array $allowedStates): array
     {
         $name = (string) ($sub['name'] ?? '');
-        $state = $this->extractState($name);
+        $state = $this->resolveState($sub, $name);
 
         return [
             'id' => (string) ($sub['id'] ?? ''),
@@ -141,6 +159,114 @@ class StopService
             'state' => $state,
             'allowed' => $state !== null && in_array($state, $allowedStates, true),
         ];
+    }
+
+    private function enrichStops(array $stops, ?Command $command = null): array
+    {
+        $enriched = [];
+        $detailById = [];
+        $total = count($stops);
+        $bar = null;
+
+        if ($command !== null && $total > 0) {
+            $command->line("Enriching {$total} stops with detail data...");
+            $bar = $command->getOutput()->createProgressBar($total);
+            $bar->start();
+        }
+
+        foreach ($stops as $index => $stop) {
+            if (! is_array($stop)) {
+                if ($bar !== null) {
+                    $bar->advance();
+                }
+
+                continue;
+            }
+
+            $stopId = (string) ($stop['id'] ?? '');
+            if ($command !== null && $bar === null) {
+                $current = $index + 1;
+                $command->line("Processing stop {$current}/{$total}: {$stopId}");
+            }
+            $detail = $stopId !== '' ? $this->getDetailForId($stopId, $detailById) : [];
+            $mergedStop = array_merge($stop, $detail);
+
+            $rawSubstops = $mergedStop['substops'] ?? [];
+            if (! is_array($rawSubstops)) {
+                $rawSubstops = [];
+            }
+
+            $mergedSubstops = [];
+            foreach ($rawSubstops as $substop) {
+                if (! is_array($substop)) {
+                    continue;
+                }
+
+                $substopId = (string) ($substop['id'] ?? '');
+                if ($command !== null && $substopId !== '') {
+                    $command->line("  -> Substop {$substopId}");
+                }
+                $substopDetail = $substopId !== '' ? $this->getDetailForId($substopId, $detailById) : [];
+                $mergedSubstops[] = array_merge($substop, $substopDetail);
+            }
+
+            $mergedStop['substops'] = $mergedSubstops;
+            $enriched[] = $mergedStop;
+
+            if ($bar !== null) {
+                $bar->advance();
+            }
+        }
+
+        if ($bar !== null) {
+            $bar->finish();
+            $command?->newLine();
+        }
+
+        return $enriched;
+    }
+
+    private function getDetailForId(string $id, array &$detailById): array
+    {
+        if (array_key_exists($id, $detailById)) {
+            return $detailById[$id];
+        }
+
+        try {
+            $detailById[$id] = $this->extractStop($this->getStopDetail($id));
+        } catch (\Throwable) {
+            $detailById[$id] = [];
+        }
+
+        return $detailById[$id];
+    }
+
+    private function extractStops(array $payload): array
+    {
+        if (isset($payload['stops']) && is_array($payload['stops'])) {
+            return $payload['stops'];
+        }
+
+        return $payload;
+    }
+
+    private function extractStop(array $payload): array
+    {
+        if (isset($payload['stop']) && is_array($payload['stop'])) {
+            return $payload['stop'];
+        }
+
+        return $payload;
+    }
+
+    private function resolveState(array $item, string $name): ?string
+    {
+        $state = strtoupper(trim((string) ($item['state'] ?? '')));
+        if ($state !== '' && preg_match('/^[A-Z]{2}$/', $state) === 1) {
+            return $state;
+        }
+
+        return $this->extractState($name);
     }
 
     private function extractState(string $name): ?string

@@ -11,12 +11,16 @@ class QueroPassagemClient
 {
     public function __construct(
         private readonly HttpFactory $http,
-    ) {
-    }
+    ) {}
 
     public function getStops(): array
     {
         return $this->request()->get('/stops')->throw()->json();
+    }
+
+    public function getStop(string $id): array
+    {
+        return $this->request()->get("/stops/{$id}")->throw()->json();
     }
 
     public function getCompanies(): array
@@ -31,7 +35,7 @@ class QueroPassagemClient
 
     public function search(array $data): array
     {
-        $affiliate = config('services.queropassagem.affiliate');    
+        $affiliate = config('services.queropassagem.affiliate');
         if (filled($affiliate)) {
             $data['affiliateCode'] = (string) $affiliate;
         }
