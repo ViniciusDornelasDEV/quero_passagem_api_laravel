@@ -10,8 +10,7 @@ class StopService
 {
     public function __construct(
         private readonly QueroPassagemClient $client,
-    ) {
-    }
+    ) {}
 
     public function getStops(): array
     {
@@ -24,6 +23,7 @@ class StopService
     {
         return collect($this->getStops())->filter(function (array $stop): bool {
             $name = (string) ($stop['name'] ?? '');
+
             return str_contains($name, ', SP') || str_contains($name, ', PR');
         })->values()->all();
     }
@@ -35,7 +35,7 @@ class StopService
 
         if ($stop === null) {
             throw ValidationException::withMessages([
-                'stop' => "Rodoviária não encontrada.",
+                'stop' => 'Rodoviária não encontrada.',
             ]);
         }
 
@@ -50,10 +50,50 @@ class StopService
             $stops = $payload['stops'];
         }
 
-        return collect($stops)
-            ->filter(fn (mixed $item): bool => is_array($item))
-            ->map(fn (array $item): array => $item)
-            ->values()
-            ->all();
+        $normalized = [];
+
+        foreach ($stops as $item) {
+            if (! is_array($item)) {
+                continue;
+            }
+            $normalized[] = $this->normalizeStop($item);
+        }
+
+        return $normalized;
+    }
+
+    private function normalizeStop(array $item): array
+    {
+        $rawSubstops = $item['substops'] ?? [];
+        if (! is_array($rawSubstops)) {
+            $rawSubstops = [];
+        }
+
+        $substops = [];
+
+        foreach ($rawSubstops as $sub) {
+            if (! is_array($sub)) {
+                continue;
+            }
+            $substops[] = $this->normalizeSubstop($sub);
+        }
+
+        return [
+            'id' => (string) ($item['id'] ?? ''),
+            'name' => (string) ($item['name'] ?? ''),
+            'url' => (string) ($item['url'] ?? ''),
+            'type' => (string) ($item['type'] ?? ''),
+            'substops' => $substops,
+        ];
+    }
+
+    private function normalizeSubstop(array $sub): array
+    {
+        return [
+            'id' => (string) ($sub['id'] ?? ''),
+            'name' => (string) ($sub['name'] ?? ''),
+            'url' => (string) ($sub['url'] ?? ''),
+            'type' => (string) ($sub['type'] ?? 'station'),
+        ];
     }
 }
