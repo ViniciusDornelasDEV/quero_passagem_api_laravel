@@ -106,7 +106,7 @@ class SeatServiceTest extends TestCase
         $this->assertSame('seat', $result[0]['type']);
     }
 
-    public function test_sorts_seats_numerically_by_seat_number(): void
+    public function test_sorts_seats_by_matrix_position_x_then_y(): void
     {
         $payload = [
             [
@@ -145,6 +145,6 @@ class SeatServiceTest extends TestCase
         $service = new SeatService($client);
         $result = $service->getSeats([]);
 
-        $this->assertSame(['02', '5', '10'], array_column($result, 'seat_number'));
+        $this->assertSame(['10', '02', '5'], array_column($result, 'seat_number'));
     }
 }

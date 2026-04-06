@@ -8,8 +8,7 @@ class SeatService
 {
     public function __construct(
         private readonly QueroPassagemClient $client,
-    ) {
-    }
+    ) {}
 
     public function getSeats(array $data): array
     {
@@ -20,7 +19,7 @@ class SeatService
 
     private function normalizeSeatPayload(array $payload): array
     {
-        if (!isset($payload[0]['seats']) || !is_array($payload[0]['seats'])) {
+        if (! isset($payload[0]['seats']) || ! is_array($payload[0]['seats'])) {
             return [];
         }
 
@@ -29,16 +28,12 @@ class SeatService
         $result = [];
 
         foreach ($seats as $seat) {
-            if (!is_array($seat)) {
+            if (! is_array($seat)) {
                 continue;
             }
 
             foreach ($seat as $cell) {
-                if (!is_array($cell)) {
-                    continue;
-                }
-
-                if (data_get($cell, 'type') !== 'seat') {
+                if (! is_array($cell)) {
                     continue;
                 }
 
@@ -46,18 +41,22 @@ class SeatService
                     'seat_number' => data_get($cell, 'seat'),
                     'occupied' => (bool) data_get($cell, 'occupied', false),
                     'type' => data_get($cell, 'type'),
-                    'x' => data_get($cell, 'position.x'),
-                    'y' => data_get($cell, 'position.y'),
+                    'x' => (int) data_get($cell, 'position.x', 0),
+                    'y' => (int) data_get($cell, 'position.y', 0),
                 ];
             }
         }
+
         return $this->sortSeats($result);
     }
 
     private function sortSeats(array $seats): array
     {
         return collect($seats)
-            ->sortBy(fn ($seat) => (int) $seat['seat_number'])
+            ->sortBy([
+                ['x', 'asc'],
+                ['y', 'asc'],
+            ])
             ->values()
             ->all();
     }
